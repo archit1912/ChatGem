@@ -13,6 +13,7 @@ import { Send, Bot, User, Coins, Zap, Brain } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import type { User as UserType } from "@/lib/auth"
 import { updateTestUserTokens } from "@/lib/auth"
+import Link from "next/link"
 
 interface Message {
   id: string
@@ -268,6 +269,23 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
             </Badge>
           </div>
         </div>
+        {user.tokens <= 10 && (
+          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Coins className="h-4 w-4 text-orange-600 mr-2" />
+                <span className="text-sm text-orange-800">
+                  {user.tokens === 0 ? "No tokens remaining" : `Only ${user.tokens} tokens left`}
+                </span>
+              </div>
+              <Link href="/pricing">
+                <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
+                  Buy Tokens
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
