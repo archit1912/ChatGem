@@ -21,7 +21,14 @@ export const config = {
     models: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"],
   },
 
-  // Razorpay config (test keys)
+  // Cashfree config (production keys)
+  cashfree: {
+    appId: "10316540dfbe6fd07ffb7a85ecd4561301",
+    secretKey: "cfsk_ma_prod_dcfcdffe5f803624e4ffac98dc6704c1_d6a99017",
+    environment: "PRODUCTION", // or "SANDBOX" for testing
+  },
+
+  // Razorpay config (test keys) - keeping as fallback
   razorpay: {
     keyId: "rzp_test_1DP5mmOlF5G5ag",
     keySecret: "thisissecretkey",
@@ -61,7 +68,7 @@ export const testMessages = [
     id: "msg-2",
     user_id: "test-user-1",
     content:
-      "Hello! I'm doing great, thank you for asking. I'm an AI assistant powered by Google's Gemini AI. How can I help you today?",
+      "Hello! I'm doing great, thank you for asking. I'm an AI assistant powered by advanced technology. How can I help you today?",
     role: "assistant",
     created_at: new Date(Date.now() - 30000).toISOString(),
   },

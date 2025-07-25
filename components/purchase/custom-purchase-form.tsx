@@ -6,8 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { CreditCard, Smartphone, Wallet, DollarSign } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
 import { CryptoPaymentModal } from "./crypto-payment-modal"
+import { CashfreePaymentForm } from "./cashfree-payment-form"
 
 interface CustomPurchaseFormProps {
   amount: number
@@ -15,52 +15,18 @@ interface CustomPurchaseFormProps {
 }
 
 export function CustomPurchaseForm({ amount, tokens }: CustomPurchaseFormProps) {
-  const [loading, setLoading] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<"select" | "cashfree" | "crypto">("select")
   const [showCrypto, setShowCrypto] = useState(false)
 
-  const handleINRPayment = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch("/api/payment/create-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: amount * 100, // Convert to paise
-          tokens,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create order")
-      }
-
-      // In demo mode, simulate successful payment
-      toast({
-        title: "Payment Successful! 🎉",
-        description: `${tokens} tokens have been added to your account.`,
-      })
-
-      // Redirect to dashboard after successful payment
-      setTimeout(() => {
-        window.location.href = "/dashboard"
-      }, 2000)
-    } catch (error: any) {
-      toast({
-        title: "Payment Failed",
-        description: error.message,
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCryptoPayment = () => {
-    setShowCrypto(true)
+  if (paymentMethod === "cashfree") {
+    return (
+      <div className="space-y-4">
+        <Button variant="outline" onClick={() => setPaymentMethod("select")} className="mb-4">
+          ← Back to Payment Methods
+        </Button>
+        <CashfreePaymentForm amount={amount} tokens={tokens} planName="Custom Token Purchase" />
+      </div>
+    )
   }
 
   return (
@@ -89,7 +55,7 @@ export function CustomPurchaseForm({ amount, tokens }: CustomPurchaseFormProps) 
       <div className="space-y-4">
         <h3 className="font-semibold text-gray-900">Choose Payment Method</h3>
 
-        {/* INR Payment */}
+        {/* Cashfree Payment */}
         <Card className="cursor-pointer hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -98,7 +64,7 @@ export function CustomPurchaseForm({ amount, tokens }: CustomPurchaseFormProps) 
                   <CreditCard className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900">INR Payment</h4>
+                  <h4 className="font-medium text-gray-900">Cashfree Payment</h4>
                   <p className="text-sm text-gray-600">Cards, UPI, Net Banking, Wallets</p>
                 </div>
               </div>
@@ -109,8 +75,8 @@ export function CustomPurchaseForm({ amount, tokens }: CustomPurchaseFormProps) 
                 </Badge>
               </div>
             </div>
-            <Button className="w-full mt-4" onClick={handleINRPayment} disabled={loading}>
-              {loading ? "Processing..." : "Pay with INR"}
+            <Button className="w-full mt-4" onClick={() => setPaymentMethod("cashfree")}>
+              Pay with Cashfree
             </Button>
           </CardContent>
         </Card>
@@ -135,7 +101,7 @@ export function CustomPurchaseForm({ amount, tokens }: CustomPurchaseFormProps) 
                 </Badge>
               </div>
             </div>
-            <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={handleCryptoPayment}>
+            <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={() => setShowCrypto(true)}>
               Pay with USDT
             </Button>
           </CardContent>
