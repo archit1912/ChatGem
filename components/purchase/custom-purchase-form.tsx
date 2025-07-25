@@ -1,133 +1,140 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { CreditCard, Smartphone, Wallet, DollarSign } from "lucide-react"
-import { CryptoPaymentModal } from "./crypto-payment-modal"
+import { CreditCard, Coins, Gift, Calculator } from "lucide-react"
 import { CashfreePaymentForm } from "./cashfree-payment-form"
+import { CryptoPaymentModal } from "./crypto-payment-modal"
 
-interface CustomPurchaseFormProps {
-  amount: number
-  tokens: number
-}
+export function CustomPurchaseForm() {
+  const [amount, setAmount] = useState<number>(100)
+  const [tokens, setTokens] = useState<number>(1000)
+  const [bonusTokens, setBonusTokens] = useState<number>(0)
+  const [totalTokens, setTotalTokens] = useState<number>(1000)
+  const [activeTab, setActiveTab] = useState("cashfree")
 
-export function CustomPurchaseForm({ amount, tokens }: CustomPurchaseFormProps) {
-  const [paymentMethod, setPaymentMethod] = useState<"select" | "cashfree" | "crypto">("select")
-  const [showCrypto, setShowCrypto] = useState(false)
+  // Token calculation: ₹1 = 10 tokens, 10% bonus on ₹500+
+  useEffect(() => {
+    const baseTokens = amount * 10
+    const bonus = amount >= 500 ? Math.floor(baseTokens * 0.1) : 0
+    const total = baseTokens + bonus
 
-  if (paymentMethod === "cashfree") {
-    return (
-      <div className="space-y-4">
-        <Button variant="outline" onClick={() => setPaymentMethod("select")} className="mb-4">
-          ← Back to Payment Methods
-        </Button>
-        <CashfreePaymentForm amount={amount} tokens={tokens} planName="Custom Token Purchase" />
-      </div>
-    )
+    setTokens(baseTokens)
+    setBonusTokens(bonus)
+    setTotalTokens(total)
+  }, [amount])
+
+  const handleAmountChange = (value: string) => {
+    const numValue = Number.parseFloat(value) || 0
+    if (numValue >= 10 && numValue <= 10000) {
+      setAmount(numValue)
+    }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Order Summary */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="font-semibold text-gray-900 mb-3">Order Summary</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Tokens</span>
-            <span className="font-medium">{tokens.toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Rate</span>
-            <span className="font-medium">₹0.10 per token</span>
-          </div>
-          <Separator />
-          <div className="flex justify-between text-lg font-semibold">
-            <span>Total</span>
-            <span>₹{amount}</span>
-          </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Custom Token Purchase</h1>
+          <p className="text-gray-600">Enter any amount between ₹10 - ₹10,000</p>
         </div>
-      </div>
 
-      {/* Payment Methods */}
-      <div className="space-y-4">
-        <h3 className="font-semibold text-gray-900">Choose Payment Method</h3>
-
-        {/* Cashfree Payment */}
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="bg-blue-100 p-2 rounded-lg">
-                  <CreditCard className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900">Cashfree Payment</h4>
-                  <p className="text-sm text-gray-600">Cards, UPI, Net Banking, Wallets</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold text-gray-900">₹{amount}</div>
-                <Badge variant="secondary" className="text-xs">
-                  Instant
-                </Badge>
-              </div>
+        {/* Amount Input */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Calculator className="h-5 w-5" />
+              <span>Token Calculator</span>
+            </CardTitle>
+            <CardDescription>Calculate tokens based on your budget</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount (₹)</Label>
+              <Input
+                id="amount"
+                type="number"
+                min="10"
+                max="10000"
+                step="1"
+                value={amount}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder="Enter amount"
+                className="text-lg"
+              />
+              <p className="text-xs text-gray-500">Minimum: ₹10 • Maximum: ₹10,000</p>
             </div>
-            <Button className="w-full mt-4" onClick={() => setPaymentMethod("cashfree")}>
-              Pay with Cashfree
-            </Button>
+
+            {/* Token Breakdown */}
+            <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Base Tokens (₹1 = 10 tokens)</span>
+                <span className="font-medium">{tokens.toLocaleString()}</span>
+              </div>
+
+              {bonusTokens > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-green-600 flex items-center">
+                    <Gift className="h-3 w-3 mr-1" />
+                    Bonus Tokens (10% on ₹500+)
+                  </span>
+                  <span className="font-medium text-green-600">+{bonusTokens.toLocaleString()}</span>
+                </div>
+              )}
+
+              <div className="border-t pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Total Tokens</span>
+                  <Badge variant="default" className="text-sm">
+                    {totalTokens.toLocaleString()} tokens
+                  </Badge>
+                </div>
+              </div>
+
+              {amount >= 500 && (
+                <div className="text-xs text-green-600 flex items-center">
+                  <Gift className="h-3 w-3 mr-1" />
+                  You're getting 10% bonus tokens!
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Crypto Payment */}
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="bg-green-100 p-2 rounded-lg">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900">USDT Payment</h4>
-                  <p className="text-sm text-gray-600">Tron Network (TRC-20)</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-semibold text-gray-900">${(amount / 84.5).toFixed(2)} USDT</div>
-                <Badge variant="secondary" className="text-xs">
-                  Low Fees
-                </Badge>
-              </div>
-            </div>
-            <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={() => setShowCrypto(true)}>
-              Pay with USDT
-            </Button>
+        {/* Payment Methods */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Method</CardTitle>
+            <CardDescription>Choose how you'd like to pay for your tokens</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="cashfree" className="flex items-center space-x-2">
+                  <CreditCard className="h-4 w-4" />
+                  <span>Cards & UPI</span>
+                </TabsTrigger>
+                <TabsTrigger value="crypto" className="flex items-center space-x-2">
+                  <Coins className="h-4 w-4" />
+                  <span>Crypto (USDT)</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="cashfree" className="mt-6">
+                <CashfreePaymentForm amount={amount} tokens={totalTokens} />
+              </TabsContent>
+
+              <TabsContent value="crypto" className="mt-6">
+                <CryptoPaymentModal amount={amount} tokens={totalTokens} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
-
-      {/* Payment Features */}
-      <div className="grid grid-cols-2 gap-4 text-center text-sm text-gray-600">
-        <div className="flex items-center justify-center space-x-2">
-          <Smartphone className="h-4 w-4" />
-          <span>Mobile Friendly</span>
-        </div>
-        <div className="flex items-center justify-center space-x-2">
-          <Wallet className="h-4 w-4" />
-          <span>Secure Payments</span>
-        </div>
-      </div>
-
-      {/* Crypto Payment Modal */}
-      <CryptoPaymentModal
-        isOpen={showCrypto}
-        onClose={() => setShowCrypto(false)}
-        amount={amount}
-        tokens={tokens}
-        usdtAmount={(amount / 84.5).toFixed(2)}
-      />
     </div>
   )
 }

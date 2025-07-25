@@ -4,18 +4,21 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CreditCard, Coins, Smartphone, Shield, Zap } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { CreditCard, Smartphone, Building2, Wallet, Gift } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
 interface CashfreePaymentFormProps {
   amount: number
   tokens: number
-  planName?: string
-  features?: string[]
+  onSuccess?: () => void
 }
 
-export function CashfreePaymentForm({ amount, tokens, planName, features }: CashfreePaymentFormProps) {
+export function CashfreePaymentForm({ amount, tokens, onSuccess }: CashfreePaymentFormProps) {
   const [loading, setLoading] = useState(false)
+
+  const bonusTokens = amount >= 500 ? Math.floor(tokens * 0.1) : 0
+  const totalTokens = tokens + bonusTokens
 
   const handlePayment = async () => {
     setLoading(true)
@@ -27,41 +30,28 @@ export function CashfreePaymentForm({ amount, tokens, planName, features }: Cash
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: amount,
-          tokens: tokens,
+          amount,
+          tokens: totalTokens,
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create order")
+        throw new Error(data.error || "Failed to create payment order")
       }
 
-      // In test mode, simulate successful payment
-      if (data.order_id?.startsWith("CF_ORDER_")) {
-        toast({
-          title: "Payment Successful! 🎉",
-          description: `${tokens} tokens have been added to your account.`,
-        })
-
-        // Redirect to dashboard after successful payment
-        setTimeout(() => {
-          window.location.href = "/dashboard"
-        }, 2000)
-        return
-      }
-
-      // In production, redirect to Cashfree payment page
-      if (data.payment_link) {
-        window.location.href = data.payment_link
+      // Redirect to Cashfree payment page
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl
       } else {
-        throw new Error("No payment link received")
+        throw new Error("Payment URL not received")
       }
     } catch (error: any) {
+      console.error("Payment error:", error)
       toast({
-        title: "Payment Failed",
-        description: error.message,
+        title: "Payment Error",
+        description: error.message || "Failed to initiate payment",
         variant: "destructive",
       })
     } finally {
@@ -70,88 +60,82 @@ export function CashfreePaymentForm({ amount, tokens, planName, features }: Cash
   }
 
   return (
-    <div className="max-w-md mx-auto">
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center">
-            <Zap className="h-5 w-5 mr-2 text-blue-600" />
-            {planName || "Token Purchase"}
-          </CardTitle>
-          <CardDescription>Secure payment with Cashfree</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Plan Details */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-center mb-4">
-              <div className="text-3xl font-bold text-gray-900">₹{amount}</div>
-              <Badge className="mt-2">
-                <Coins className="h-3 w-3 mr-1" />
-                {tokens.toLocaleString()} tokens
-              </Badge>
-            </div>
-            {features && (
-              <ul className="space-y-2 text-sm">
-                {features.map((feature, index) => (
-                  <li key={index} className="flex items-center text-gray-600">
-                    <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></div>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            )}
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <CreditCard className="h-5 w-5" />
+          <span>Cashfree Payment</span>
+        </CardTitle>
+        <CardDescription>Secure payment with multiple options</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Order Summary */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Amount</span>
+            <span className="font-medium">₹{amount}</span>
           </div>
-
-          {/* Payment Method */}
-          <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900">Payment Method</h3>
-
-            <Button className="w-full justify-between h-12" onClick={handlePayment} disabled={loading}>
-              <div className="flex items-center">
-                <CreditCard className="h-4 w-4 mr-2" />
-                Pay ₹{amount} with Cashfree
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                Secure
-              </Badge>
-            </Button>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Base Tokens</span>
+            <span className="font-medium">{tokens.toLocaleString()}</span>
           </div>
-
-          {/* Payment Features */}
-          <div className="grid grid-cols-3 gap-4 text-center text-xs text-gray-600">
-            <div className="flex flex-col items-center space-y-1">
-              <Shield className="h-4 w-4" />
-              <span>Secure</span>
+          {bonusTokens > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-green-600 flex items-center">
+                <Gift className="h-3 w-3 mr-1" />
+                Bonus Tokens (10%)
+              </span>
+              <span className="font-medium text-green-600">+{bonusTokens.toLocaleString()}</span>
             </div>
-            <div className="flex flex-col items-center space-y-1">
-              <Smartphone className="h-4 w-4" />
-              <span>Mobile</span>
-            </div>
-            <div className="flex flex-col items-center space-y-1">
-              <Zap className="h-4 w-4" />
-              <span>Instant</span>
-            </div>
+          )}
+          <Separator />
+          <div className="flex justify-between items-center">
+            <span className="font-medium">Total Tokens</span>
+            <Badge variant="default" className="text-sm">
+              {totalTokens.toLocaleString()} tokens
+            </Badge>
           </div>
+        </div>
 
-          {/* Supported Payment Methods */}
-          <div className="text-center">
-            <p className="text-xs text-gray-500 mb-2">Supported Payment Methods</p>
-            <div className="flex justify-center space-x-2 text-xs text-gray-400">
+        {/* Payment Methods */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-gray-700">Supported Payment Methods:</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center space-x-2 text-xs text-gray-600">
+              <CreditCard className="h-3 w-3" />
               <span>Cards</span>
-              <span>•</span>
+            </div>
+            <div className="flex items-center space-x-2 text-xs text-gray-600">
+              <Smartphone className="h-3 w-3" />
               <span>UPI</span>
-              <span>•</span>
+            </div>
+            <div className="flex items-center space-x-2 text-xs text-gray-600">
+              <Building2 className="h-3 w-3" />
               <span>Net Banking</span>
-              <span>•</span>
+            </div>
+            <div className="flex items-center space-x-2 text-xs text-gray-600">
+              <Wallet className="h-3 w-3" />
               <span>Wallets</span>
             </div>
           </div>
+        </div>
 
-          {/* Security Notice */}
-          <div className="text-center text-xs text-gray-500">
-            🔒 Payments secured by Cashfree with 256-bit SSL encryption
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        {/* Payment Button */}
+        <Button onClick={handlePayment} disabled={loading} className="w-full" size="lg">
+          {loading ? (
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Processing...</span>
+            </div>
+          ) : (
+            `Pay ₹${amount}`
+          )}
+        </Button>
+
+        <p className="text-xs text-gray-500 text-center">
+          Secure payment powered by Cashfree. Your payment information is encrypted and secure.
+        </p>
+      </CardContent>
+    </Card>
   )
 }

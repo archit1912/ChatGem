@@ -1,67 +1,90 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { DollarSign } from "lucide-react"
-import { CryptoPaymentModal } from "./crypto-payment-modal"
+import { CreditCard, Coins } from "lucide-react"
 import { CashfreePaymentForm } from "./cashfree-payment-form"
+import { CryptoPaymentModal } from "./crypto-payment-modal"
 
 interface PurchaseFormProps {
-  plan: {
+  selectedPlan: {
     name: string
     price: number
     tokens: number
-    features: string[]
+    popular?: boolean
   }
 }
 
-export function PurchaseForm({ plan }: PurchaseFormProps) {
-  const [paymentMethod, setPaymentMethod] = useState<"cashfree" | "crypto">("cashfree")
-  const [showCrypto, setShowCrypto] = useState(false)
+export function PurchaseForm({ selectedPlan }: PurchaseFormProps) {
+  const [activeTab, setActiveTab] = useState("cashfree")
 
-  if (paymentMethod === "cashfree") {
-    return (
-      <div className="space-y-4">
-        <CashfreePaymentForm amount={plan.price} tokens={plan.tokens} planName={plan.name} features={plan.features} />
-
-        <div className="text-center">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">or</span>
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            className="w-full mt-4 max-w-md mx-auto justify-between bg-transparent"
-            onClick={() => setShowCrypto(true)}
-          >
-            <div className="flex items-center">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Pay ${(plan.price / 84.5).toFixed(2)} USDT
-            </div>
-            <Badge variant="secondary" className="text-xs">
-              Crypto
-            </Badge>
-          </Button>
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Complete Your Purchase</h1>
+          <p className="text-gray-600">Choose your preferred payment method</p>
         </div>
 
-        {/* Crypto Payment Modal */}
-        <CryptoPaymentModal
-          isOpen={showCrypto}
-          onClose={() => setShowCrypto(false)}
-          amount={plan.price}
-          tokens={plan.tokens}
-          usdtAmount={(plan.price / 84.5).toFixed(2)}
-        />
-      </div>
-    )
-  }
+        {/* Selected Plan Summary */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Selected Plan</span>
+              {selectedPlan.popular && <Badge variant="default">Popular</Badge>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-semibold">{selectedPlan.name}</h3>
+                <p className="text-gray-600 flex items-center mt-1">
+                  <Coins className="h-4 w-4 mr-1" />
+                  {selectedPlan.tokens.toLocaleString()} tokens
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold">₹{selectedPlan.price}</div>
+                <div className="text-sm text-gray-500">
+                  ₹{(selectedPlan.price / selectedPlan.tokens).toFixed(2)} per token
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-  return null
+        {/* Payment Methods */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Method</CardTitle>
+            <CardDescription>Choose how you'd like to pay for your tokens</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="cashfree" className="flex items-center space-x-2">
+                  <CreditCard className="h-4 w-4" />
+                  <span>Cards & UPI</span>
+                </TabsTrigger>
+                <TabsTrigger value="crypto" className="flex items-center space-x-2">
+                  <Coins className="h-4 w-4" />
+                  <span>Crypto (USDT)</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="cashfree" className="mt-6">
+                <CashfreePaymentForm amount={selectedPlan.price} tokens={selectedPlan.tokens} />
+              </TabsContent>
+
+              <TabsContent value="crypto" className="mt-6">
+                <CryptoPaymentModal amount={selectedPlan.price} tokens={selectedPlan.tokens} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
 }
