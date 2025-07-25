@@ -4,45 +4,60 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CreditCard, Smartphone, Building2, Wallet, Gift, Loader2, AlertCircle } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
+import { Loader2, CreditCard, Smartphone, Building2, Wallet, Gift } from "lucide-react"
 import { config } from "@/lib/config"
+import { getCurrentUser } from "@/lib/auth"
+import type { User } from "@/lib/supabase"
 
 interface CashfreePaymentFormProps {
-  amount: number
-  tokens: number
-  planName?: string
+  plan: {
+    name: string
+    price: number
+    tokens: number
+    popular?: boolean
+  }
   onSuccess?: () => void
   onError?: (error: string) => void
 }
 
-// Declare Cashfree global object
-declare global {
-  interface Window {
-    Cashfree: {
-      checkout: (options: any) => void
-    }
-  }
-}
-
-export function CashfreePaymentForm({ amount, tokens, planName, onSuccess, onError }: CashfreePaymentFormProps) {
-  const [isLoading, setIsLoading] = useState(false)
+export default function CashfreePaymentForm({ plan, onSuccess, onError }: CashfreePaymentFormProps) {
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [cashfreeLoaded, setCashfreeLoaded] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [sdkReady, setSdkReady] = useState(false)
 
-  // Safe calculations with fallbacks
-  const safeAmount = Math.max(0, amount || 0)
-  const safeTokens = Math.max(0, tokens || 0)
-  const bonusTokens = safeAmount >= 500 ? Math.floor(safeTokens * 0.1) : 0
-  const totalTokens = safeTokens + bonusTokens
+  // Calculate bonus tokens
+  const bonusTokens =
+    plan.price >= config.pricing.bonusThreshold ? Math.floor(plan.tokens * (config.pricing.bonusPercentage / 100)) : 0
+  const totalTokens = plan.tokens + bonusTokens
 
-  // Load Cashfree SDK
   useEffect(() => {
+    // Check authentication
+    const checkAuth = async () => {
+      try {
+        const currentUser = await getCurrentUser()
+        console.log("Current user in payment form:", currentUser)
+        setUser(currentUser)
+        if (!currentUser) {
+          setError("Please sign in to continue with payment")
+        }
+      } catch (err) {
+        console.error("Auth check error:", err)
+        setError("Authentication error. Please try signing in again.")
+      }
+    }
+
+    checkAuth()
+  }, [])
+
+  useEffect(() => {
+    // Load Cashfree SDK
     const loadCashfreeSDK = () => {
+      if (typeof window === "undefined") return
+
+      // Check if SDK is already loaded
       if (window.Cashfree) {
-        setCashfreeLoaded(true)
+        setSdkReady(true)
         return
       }
 
@@ -53,13 +68,13 @@ export function CashfreePaymentForm({ amount, tokens, planName, onSuccess, onErr
           : "https://sdk.cashfree.com/js/v3/cashfree.sandbox.js"
 
       script.onload = () => {
-        setCashfreeLoaded(true)
         console.log("Cashfree SDK loaded successfully")
+        setSdkReady(true)
       }
 
       script.onerror = () => {
-        setError("Failed to load payment gateway")
         console.error("Failed to load Cashfree SDK")
+        setError("Failed to load payment gateway. Please refresh and try again.")
       }
 
       document.head.appendChild(script)
@@ -69,52 +84,63 @@ export function CashfreePaymentForm({ amount, tokens, planName, onSuccess, onErr
   }, [])
 
   const handlePayment = async () => {
-    if (safeAmount <= 0 || safeTokens <= 0) {
-      setError("Invalid amount or tokens")
+    if (!user) {
+      setError("Please sign in to continue")
       return
     }
 
-    if (!cashfreeLoaded) {
-      setError("Payment gateway is loading. Please try again.")
+    if (!sdkReady && !config.testMode) {
+      setError("Payment gateway is not ready. Please wait and try again.")
       return
     }
 
-    setIsLoading(true)
+    setLoading(true)
     setError(null)
 
     try {
+      console.log("Starting payment process for:", { plan, user: user.email })
+
       // Create order
-      const response = await fetch("/api/payment/cashfree/create-order", {
+      const orderResponse = await fetch("/api/payment/cashfree/create-order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          amount: safeAmount,
+          amount: plan.price,
           tokens: totalTokens,
-          plan_name: planName || "Token Purchase",
+          plan: plan.name.toLowerCase(),
         }),
       })
 
-      const data = await response.json()
+      const orderData = await orderResponse.json()
+      console.log("Order creation response:", orderData)
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Please sign in to continue with payment")
-        }
-        throw new Error(data.details || data.error || "Payment failed")
+      if (!orderResponse.ok) {
+        throw new Error(orderData.message || "Failed to create payment order")
       }
 
-      if (!data.success || !data.payment_session_id) {
-        throw new Error("Failed to create payment session")
+      // In test mode, simulate payment success
+      if (config.testMode) {
+        console.log("🧪 Test mode - simulating payment success")
+
+        // Simulate payment processing delay
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+        // Redirect to success page with order details
+        const successUrl = `/payment/success?order_id=${orderData.order_id}&status=SUCCESS&amount=${plan.price}&tokens=${totalTokens}`
+        window.location.href = successUrl
+        return
       }
 
-      console.log("Payment session created:", data)
+      // Production payment with Cashfree SDK
+      if (!window.Cashfree) {
+        throw new Error("Cashfree SDK not loaded")
+      }
 
-      // Initialize Cashfree checkout
       const checkoutOptions = {
-        paymentSessionId: data.payment_session_id,
-        returnUrl: `${config.app.url}/payment/success?order_id=${data.order_id}`,
+        paymentSessionId: orderData.payment_session_id,
+        returnUrl: `${config.app.url}/payment/success?order_id=${orderData.order_id}`,
         theme: {
           backgroundColor: "#ffffff",
           primaryColor: "#3b82f6",
@@ -122,159 +148,155 @@ export function CashfreePaymentForm({ amount, tokens, planName, onSuccess, onErr
         },
         onSuccess: (data: any) => {
           console.log("Payment successful:", data)
-          toast({
-            title: "Payment Successful!",
-            description: "Your tokens will be added shortly.",
-          })
-          // Redirect to success page
-          window.location.href = `/payment/success?order_id=${data.order_id}&payment_id=${data.payment_id}`
+          onSuccess?.()
+          window.location.href = `/payment/success?order_id=${data.order_id}&status=SUCCESS`
         },
         onFailure: (data: any) => {
-          console.error("Payment failed:", data)
-          setError(data.error_description || "Payment failed")
-          toast({
-            title: "Payment Failed",
-            description: data.error_description || "Please try again",
-            variant: "destructive",
-          })
-        },
-        onClose: () => {
-          console.log("Payment popup closed")
-          setIsLoading(false)
+          console.log("Payment failed:", data)
+          setError(data.error?.message || "Payment failed. Please try again.")
+          onError?.(data.error?.message || "Payment failed")
         },
       }
 
-      // Open Cashfree checkout
+      console.log("Opening Cashfree checkout with options:", checkoutOptions)
       window.Cashfree.checkout(checkoutOptions)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Payment failed"
+      console.error("Payment error:", err)
+      const errorMessage = err instanceof Error ? err.message : "Payment failed. Please try again."
       setError(errorMessage)
       onError?.(errorMessage)
-
-      toast({
-        title: "Payment Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
+  }
+
+  if (!user) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="text-center">Authentication Required</CardTitle>
+          <CardDescription className="text-center">Please sign in to continue with your purchase</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button className="w-full" onClick={() => (window.location.href = "/auth")}>
+            Sign In
+          </Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
     <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle className="flex items-center justify-center gap-2">
-          <CreditCard className="h-5 w-5" />
-          Cashfree Payment
-        </CardTitle>
-        <CardDescription>
-          Secure payment powered by Cashfree
-          {!cashfreeLoaded && <span className="block text-xs text-orange-600 mt-1">Loading payment gateway...</span>}
-        </CardDescription>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xl">{plan.name} Plan</CardTitle>
+          {plan.popular && <Badge variant="secondary">Popular</Badge>}
+        </div>
+        <CardDescription>Complete your purchase to get {totalTokens.toLocaleString()} tokens</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Error Alert */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        {/* User Info */}
+        <div className="bg-gray-50 p-3 rounded-lg">
+          <p className="text-sm text-gray-600">Signed in as:</p>
+          <p className="font-medium">{user.email}</p>
+          <p className="text-sm text-gray-600">Current tokens: {user.tokens}</p>
+        </div>
 
         {/* Order Summary */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Amount</span>
-            <span className="font-semibold">₹{safeAmount}</span>
-          </div>
+        <div className="space-y-3">
+          <h3 className="font-semibold">Order Summary</h3>
 
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Base Tokens</span>
-            <span>{safeTokens.toLocaleString()} tokens</span>
-          </div>
-
-          {bonusTokens > 0 && (
-            <div className="flex justify-between items-center text-green-600">
-              <span className="text-sm flex items-center gap-1">
-                <Gift className="h-3 w-3" />
-                Bonus (10%)
-              </span>
-              <span>+{bonusTokens.toLocaleString()} tokens</span>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span>Base tokens:</span>
+              <span>{plan.tokens.toLocaleString()}</span>
             </div>
-          )}
 
-          <Separator />
+            {bonusTokens > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span className="flex items-center gap-1">
+                  <Gift className="h-4 w-4" />
+                  Bonus tokens ({config.pricing.bonusPercentage}%):
+                </span>
+                <span>+{bonusTokens.toLocaleString()}</span>
+              </div>
+            )}
 
-          <div className="flex justify-between items-center font-semibold">
-            <span>Total Tokens</span>
-            <Badge variant="secondary" className="text-base">
-              {totalTokens.toLocaleString()} tokens
-            </Badge>
+            <div className="border-t pt-2 flex justify-between font-semibold">
+              <span>Total tokens:</span>
+              <span>{totalTokens.toLocaleString()}</span>
+            </div>
+
+            <div className="flex justify-between text-lg font-bold">
+              <span>Amount:</span>
+              <span>₹{plan.price}</span>
+            </div>
           </div>
         </div>
 
         {/* Payment Methods */}
         <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-700">Supported Payment Methods</h4>
-          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-3 w-3" />
-              Cards
+          <h3 className="font-semibold">Payment Methods</h3>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+              <CreditCard className="h-4 w-4" />
+              <span>Cards</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Smartphone className="h-3 w-3" />
-              UPI
+            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+              <Smartphone className="h-4 w-4" />
+              <span>UPI</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Building2 className="h-3 w-3" />
-              Net Banking
+            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+              <Building2 className="h-4 w-4" />
+              <span>Net Banking</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Wallet className="h-3 w-3" />
-              Wallets
+            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+              <Wallet className="h-4 w-4" />
+              <span>Wallets</span>
             </div>
           </div>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Test Mode Banner */}
+        {config.testMode && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-yellow-800 text-sm">🧪 Test Mode: This is a simulated payment for development</p>
+          </div>
+        )}
+
         {/* Pay Button */}
-        <Button
-          onClick={handlePayment}
-          disabled={isLoading || !cashfreeLoaded || safeAmount <= 0 || safeTokens <= 0}
-          className="w-full"
-          size="lg"
-        >
-          {isLoading ? (
+        <Button onClick={handlePayment} disabled={loading || !!error} className="w-full" size="lg">
+          {loading ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : !cashfreeLoaded ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Loading Gateway...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {config.testMode ? "Processing..." : "Opening Payment Gateway..."}
             </>
           ) : (
-            <>
-              <CreditCard className="h-4 w-4 mr-2" />
-              Pay ₹{safeAmount}
-            </>
+            `Pay ₹${plan.price}`
           )}
         </Button>
 
         {/* Security Note */}
-        <p className="text-xs text-gray-500 text-center">
-          🔒 Secured by 256-bit SSL encryption. Your payment information is safe.
-        </p>
-
-        {/* Environment Info */}
-        {config.cashfree.environment === "SANDBOX" && (
-          <div className="text-xs text-center p-2 bg-yellow-50 border border-yellow-200 rounded">
-            <span className="text-yellow-700">🧪 Sandbox Mode - Use test cards for payment</span>
-          </div>
-        )}
+        <p className="text-xs text-gray-500 text-center">🔒 Secure payment powered by Cashfree</p>
       </CardContent>
     </Card>
   )
+}
+
+// Extend Window interface for Cashfree SDK
+declare global {
+  interface Window {
+    Cashfree: {
+      checkout: (options: any) => void
+    }
+  }
 }

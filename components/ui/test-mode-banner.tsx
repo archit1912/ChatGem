@@ -1,37 +1,58 @@
 "use client"
 
+import { useState } from "react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { TestTube } from "lucide-react"
+import { TestTube, X, Settings, Database, CreditCard } from "lucide-react"
 import { config } from "@/lib/config"
 
-export function TestModeBanner() {
-  // Remove test mode banner in production
-  if (!config.isTestMode) return null
+export default function TestModeBanner() {
+  const [isVisible, setIsVisible] = useState(true)
+
+  if (!config.testMode || !isVisible) {
+    return null
+  }
 
   return (
-    <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2">
-      <div className="container mx-auto">
-        <div className="flex items-center justify-center space-x-2 mb-1">
-          <TestTube className="h-4 w-4 text-yellow-600" />
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-            DEMO MODE ACTIVE
-          </Badge>
+    <Alert className="border-yellow-200 bg-yellow-50 mb-4">
+      <TestTube className="h-4 w-4 text-yellow-600" />
+      <div className="flex items-center justify-between w-full">
+        <div className="flex-1">
+          <AlertDescription className="text-yellow-800">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-medium">Development Mode Active</span>
+              <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300 text-xs">
+                Test Environment
+              </Badge>
+            </div>
+            <div className="text-sm space-y-1">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <Database className="h-3 w-3" />
+                  Data stored locally
+                </span>
+                <span className="flex items-center gap-1">
+                  <CreditCard className="h-3 w-3" />
+                  Payments simulated
+                </span>
+                <span className="flex items-center gap-1">
+                  <Settings className="h-3 w-3" />
+                  AI fallback enabled
+                </span>
+              </div>
+            </div>
+          </AlertDescription>
         </div>
-        <div className="text-center text-sm text-yellow-700">
-          <div className="font-medium mb-1">Demo Credentials Available:</div>
-          <div className="flex justify-center space-x-4 text-xs">
-            <span>
-              <strong>User:</strong> demo@example.com
-            </span>
-            <span>
-              <strong>Admin:</strong> admin@example.com
-            </span>
-            <span>
-              <strong>Password:</strong> anything
-            </span>
-          </div>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsVisible(false)}
+          className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100 ml-2"
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
-    </div>
+    </Alert>
   )
 }

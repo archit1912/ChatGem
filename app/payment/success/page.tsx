@@ -1,176 +1,224 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Coins, MessageSquare, Home, Gift, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { CheckCircle, XCircle, Loader2, ArrowRight, Home, MessageSquare } from "lucide-react"
+import Link from "next/link"
 import { toast } from "@/hooks/use-toast"
+
+interface PaymentResult {
+  success: boolean
+  payment_status: string
+  tokens_added: number
+  payment_id: string
+  order_id: string
+  error?: string
+}
 
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams()
-  const router = useRouter()
-  const [verifying, setVerifying] = useState(true)
-  const [paymentData, setPaymentData] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [verificationResult, setVerificationResult] = useState<PaymentResult | null>(null)
+  const [isVerifying, setIsVerifying] = useState(true)
 
   const orderId = searchParams.get("order_id")
   const paymentId = searchParams.get("payment_id")
 
   useEffect(() => {
-    if (orderId) {
-      verifyPayment()
-    } else {
-      setError("No order ID found")
-      setVerifying(false)
+    const verifyPayment = async () => {
+      if (!orderId) {
+        setVerificationResult({
+          success: false,
+          payment_status: "FAILED",
+          tokens_added: 0,
+          payment_id: "",
+          order_id: "",
+          error: "Missing order ID",
+        })
+        setIsVerifying(false)
+        return
+      }
+
+      try {
+        console.log("Verifying payment:", { orderId, paymentId })
+
+        const response = await fetch("/api/payment/cashfree/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            payment_id: paymentId,
+          }),
+        })
+
+        const result = await response.json()
+        console.log("Verification result:", result)
+
+        setVerificationResult(result)
+
+        if (result.success) {
+          toast({
+            title: "Payment Successful!",
+            description: `${result.tokens_added} tokens have been added to your account.`,
+          })
+        } else {
+          toast({
+            title: "Payment Verification Failed",
+            description: result.error || "Please contact support if you were charged.",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Payment verification error:", error)
+        setVerificationResult({
+          success: false,
+          payment_status: "FAILED",
+          tokens_added: 0,
+          payment_id: "",
+          order_id: orderId,
+          error: "Verification failed",
+        })
+
+        toast({
+          title: "Verification Error",
+          description: "Unable to verify payment. Please contact support.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsVerifying(false)
+      }
     }
+
+    verifyPayment()
   }, [orderId, paymentId])
 
-  const verifyPayment = async () => {
-    try {
-      console.log("Verifying payment:", { orderId, paymentId })
-
-      const response = await fetch("/api/payment/cashfree/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId,
-          paymentId,
-        }),
-      })
-
-      const data = await response.json()
-      console.log("Verification response:", data)
-
-      if (response.ok && data.success) {
-        setPaymentData(data)
-        toast({
-          title: "Payment Successful!",
-          description: `${data.tokens} tokens have been added to your account.`,
-        })
-      } else {
-        setError(data.error || "Payment verification failed")
-      }
-    } catch (error) {
-      console.error("Payment verification error:", error)
-      setError("Failed to verify payment")
-    } finally {
-      setVerifying(false)
-    }
-  }
-
-  if (verifying) {
+  if (isVerifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center p-8">
-            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Verifying Payment</h2>
-            <p className="text-gray-600 text-center">Please wait while we confirm your payment...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Verifying Payment</h2>
+            <p className="text-sm text-gray-600 text-center">Please wait while we confirm your payment...</p>
           </CardContent>
         </Card>
       </div>
     )
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-red-600">Payment Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-sm text-gray-600">
-              If you believe this is an error, please contact support with order ID: {orderId}
-            </p>
-            <div className="space-y-2">
-              <Button onClick={() => router.push("/pricing")} className="w-full">
-                Try Again
-              </Button>
-              <Button onClick={() => router.push("/dashboard")} variant="outline" className="w-full">
-                Go to Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  const isSuccess = verificationResult?.success && verificationResult?.payment_status === "SUCCESS"
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-            <CheckCircle className="h-6 w-6 text-green-600" />
+          <div className="flex justify-center mb-4">
+            {isSuccess ? (
+              <CheckCircle className="h-16 w-16 text-green-500" />
+            ) : (
+              <XCircle className="h-16 w-16 text-red-500" />
+            )}
           </div>
-          <CardTitle className="text-green-600">Payment Successful!</CardTitle>
-          <CardDescription>Your tokens have been added to your account</CardDescription>
+          <CardTitle className={isSuccess ? "text-green-700" : "text-red-700"}>
+            {isSuccess ? "Payment Successful!" : "Payment Failed"}
+          </CardTitle>
+          <CardDescription>
+            {isSuccess ? "Your tokens have been added to your account" : "There was an issue with your payment"}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+
+        <CardContent className="space-y-6">
           {/* Payment Details */}
-          <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">Order ID</span>
-              <span className="text-sm font-mono">{orderId}</span>
+              <span className="text-sm font-mono">{verificationResult?.order_id}</span>
             </div>
-            {paymentId && (
+
+            {verificationResult?.payment_id && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Payment ID</span>
-                <span className="text-sm font-mono">{paymentId}</span>
+                <span className="text-sm font-mono">{verificationResult.payment_id}</span>
               </div>
             )}
+
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Amount Paid</span>
-              <span className="font-medium">₹{paymentData?.payment?.payment_amount || 100}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Tokens Added</span>
-              <Badge variant="default" className="text-sm">
-                <Coins className="h-3 w-3 mr-1" />
-                {paymentData?.tokens?.toLocaleString() || "1,000"}
+              <span className="text-sm text-gray-600">Status</span>
+              <Badge variant={isSuccess ? "default" : "destructive"}>
+                {verificationResult?.payment_status || "UNKNOWN"}
               </Badge>
             </div>
-            {paymentData?.bonusTokens > 0 && (
+
+            {isSuccess && verificationResult?.tokens_added > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-green-600 flex items-center">
-                  <Gift className="h-3 w-3 mr-1" />
-                  Bonus Tokens
-                </span>
-                <Badge variant="secondary" className="text-sm text-green-600">
-                  +{paymentData.bonusTokens.toLocaleString()}
+                <span className="text-sm text-gray-600">Tokens Added</span>
+                <Badge variant="secondary" className="text-base">
+                  +{verificationResult.tokens_added.toLocaleString()} tokens
                 </Badge>
               </div>
             )}
-            <div className="border-t pt-2">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">New Balance</span>
-                <Badge variant="outline" className="text-sm">
-                  {paymentData?.newBalance?.toLocaleString() || "1,000"} tokens
-                </Badge>
-              </div>
-            </div>
           </div>
+
+          {/* Error Message */}
+          {!isSuccess && verificationResult?.error && (
+            <Alert variant="destructive">
+              <XCircle className="h-4 w-4" />
+              <AlertDescription>{verificationResult.error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Success Message */}
+          {isSuccess && (
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                Your payment has been processed successfully and tokens have been added to your account.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Action Buttons */}
-          <div className="space-y-2">
-            <Button onClick={() => router.push("/chat")} className="w-full" size="lg">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Start Chatting
-            </Button>
-            <Button onClick={() => router.push("/dashboard")} variant="outline" className="w-full">
-              <Home className="h-4 w-4 mr-2" />
-              Go to Dashboard
-            </Button>
+          <div className="space-y-3">
+            {isSuccess ? (
+              <>
+                <Link href="/chat">
+                  <Button className="w-full" size="lg">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Start Chatting
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+                <Link href="/dashboard">
+                  <Button variant="outline" className="w-full bg-transparent">
+                    <Home className="h-4 w-4 mr-2" />
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/pricing">
+                  <Button className="w-full" size="lg">
+                    Try Again
+                  </Button>
+                </Link>
+                <Link href="/contact">
+                  <Button variant="outline" className="w-full bg-transparent">
+                    Contact Support
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
+          {/* Support Note */}
           <p className="text-xs text-gray-500 text-center">
-            Thank you for choosing ChatGem! Your tokens are ready to use.
+            If you have any issues, please contact our support team with your order ID.
           </p>
         </CardContent>
       </Card>
