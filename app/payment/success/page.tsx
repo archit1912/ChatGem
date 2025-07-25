@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Coins, MessageSquare, Home, Gift } from "lucide-react"
+import { CheckCircle, Coins, MessageSquare, Home, Gift, Loader2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
 export default function PaymentSuccessPage() {
@@ -29,6 +29,8 @@ export default function PaymentSuccessPage() {
 
   const verifyPayment = async () => {
     try {
+      console.log("Verifying payment:", { orderId, paymentId })
+
       const response = await fetch("/api/payment/cashfree/verify", {
         method: "POST",
         headers: {
@@ -41,6 +43,7 @@ export default function PaymentSuccessPage() {
       })
 
       const data = await response.json()
+      console.log("Verification response:", data)
 
       if (response.ok && data.success) {
         setPaymentData(data)
@@ -64,7 +67,7 @@ export default function PaymentSuccessPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
             <h2 className="text-xl font-semibold mb-2">Verifying Payment</h2>
             <p className="text-gray-600 text-center">Please wait while we confirm your payment...</p>
           </CardContent>
@@ -81,10 +84,18 @@ export default function PaymentSuccessPage() {
             <CardTitle className="text-red-600">Payment Error</CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <Button onClick={() => router.push("/pricing")} className="w-full">
-              Try Again
-            </Button>
+          <CardContent className="text-center space-y-4">
+            <p className="text-sm text-gray-600">
+              If you believe this is an error, please contact support with order ID: {orderId}
+            </p>
+            <div className="space-y-2">
+              <Button onClick={() => router.push("/pricing")} className="w-full">
+                Try Again
+              </Button>
+              <Button onClick={() => router.push("/dashboard")} variant="outline" className="w-full">
+                Go to Dashboard
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

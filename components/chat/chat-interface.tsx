@@ -35,6 +35,10 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
   const [aiStatus, setAiStatus] = useState<"connected" | "intelligent" | "unknown">("unknown")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
+  // Safe user property access with fallbacks
+  const userTokens = user?.tokens ?? 0
+  const userId = user?.id ?? "unknown"
+
   useEffect(() => {
     loadMessages()
   }, [])
@@ -50,7 +54,7 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
       const response = await fetch("/api/messages")
       if (response.ok) {
         const data = await response.json()
-        setMessages(data.messages)
+        setMessages(data.messages || [])
       }
     } catch (error) {
       console.error("Error loading messages:", error)
@@ -63,7 +67,7 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
     e.preventDefault()
     if (!input.trim() || loading) return
 
-    if (user.tokens <= 0) {
+    if (userTokens <= 0) {
       toast({
         title: "No tokens remaining",
         description: "Please purchase more tokens to continue chatting.",
@@ -101,7 +105,7 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
       }
 
       // Update messages with actual data from server
-      setMessages(data.messages)
+      setMessages(data.messages || [])
       if (data.remainingTokens !== undefined) {
         onTokenUpdate(data.remainingTokens)
         // Update test user tokens if in test mode
@@ -113,17 +117,17 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
         setAiStatus(data.aiStatus)
       }
 
-      if (data.remainingTokens <= 5) {
+      if ((data.remainingTokens ?? 0) <= 5) {
         toast({
           title: "Low tokens",
-          description: `You have ${data.remainingTokens} tokens remaining.`,
+          description: `You have ${data.remainingTokens ?? 0} tokens remaining.`,
           variant: "destructive",
         })
       }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to send message",
         variant: "destructive",
       })
       // Remove the temporary user message on error
@@ -152,7 +156,7 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
             <div className="text-center text-gray-500 mt-8">
               <Bot className="h-12 w-12 mx-auto mb-4 text-gray-400" />
               <p>Start a conversation with your ChatGem AI assistant!</p>
-              <p className="text-sm mt-2">You have {user.tokens} tokens remaining.</p>
+              <p className="text-sm mt-2">You have {userTokens} tokens remaining.</p>
               <div className="mt-4">
                 <Badge variant={aiStatus === "connected" ? "default" : "secondary"} className="text-xs">
                   {aiStatus === "connected" ? (
@@ -234,18 +238,18 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={user.tokens > 0 ? "Type your message..." : "No tokens remaining"}
-            disabled={loading || user.tokens <= 0}
+            placeholder={userTokens > 0 ? "Type your message..." : "No tokens remaining"}
+            disabled={loading || userTokens <= 0}
             className="flex-1"
           />
-          <Button type="submit" disabled={loading || !input.trim() || user.tokens <= 0} size="icon">
+          <Button type="submit" disabled={loading || !input.trim() || userTokens <= 0} size="icon">
             <Send className="h-4 w-4" />
           </Button>
         </form>
         <div className="flex items-center justify-between mt-2 text-sm text-gray-600">
           <span className="flex items-center">
             <Coins className="h-4 w-4 mr-1" />
-            {user.tokens} tokens remaining
+            {userTokens} tokens remaining
           </span>
           <div className="flex items-center space-x-2">
             <span>1 message = 1 token</span>
@@ -269,13 +273,13 @@ export function ChatInterface({ user, onTokenUpdate }: ChatInterfaceProps) {
             </Badge>
           </div>
         </div>
-        {user.tokens <= 10 && (
+        {userTokens <= 10 && (
           <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Coins className="h-4 w-4 text-orange-600 mr-2" />
                 <span className="text-sm text-orange-800">
-                  {user.tokens === 0 ? "No tokens remaining" : `Only ${user.tokens} tokens left`}
+                  {userTokens === 0 ? "No tokens remaining" : `Only ${userTokens} tokens left`}
                 </span>
               </div>
               <Link href="/pricing">

@@ -38,6 +38,9 @@ export const signOut = async () => {
   throw new Error("Production mode not available in this environment")
 }
 
+// Add logout as an alias for signOut for backward compatibility
+export const logout = signOut
+
 export const getCurrentUser = async (): Promise<User | null> => {
   if (isTestMode) {
     return TestModeAuth.getCurrentUser()

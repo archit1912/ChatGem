@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Menu, X, User, LogOut, Settings, Coins, CreditCard, Shield } from "lucide-react"
 import type { User as UserType } from "@/lib/auth"
-import { logout } from "@/lib/auth"
+import { signOut } from "@/lib/auth"
 
 interface HeaderProps {
   user: UserType
@@ -23,16 +23,21 @@ interface HeaderProps {
 export function Header({ user }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await signOut()
     window.location.href = "/"
   }
 
+  // Safe token handling with fallback
+  const userTokens = user?.tokens ?? 0
+  const userEmail = user?.email ?? "Unknown User"
+  const isAdmin = user?.is_admin ?? false
+
   const getTokenStatus = () => {
-    if (user.tokens === 0) return { color: "bg-red-500", text: "0" }
-    if (user.tokens <= 10) return { color: "bg-orange-500", text: user.tokens.toString() }
-    if (user.tokens <= 50) return { color: "bg-yellow-500", text: user.tokens.toString() }
-    return { color: "bg-green-500", text: user.tokens.toString() }
+    if (userTokens === 0) return { color: "bg-red-500", text: "0" }
+    if (userTokens <= 10) return { color: "bg-orange-500", text: userTokens.toString() }
+    if (userTokens <= 50) return { color: "bg-yellow-500", text: userTokens.toString() }
+    return { color: "bg-green-500", text: userTokens.toString() }
   }
 
   const tokenStatus = getTokenStatus()
@@ -60,7 +65,7 @@ export function Header({ user }: HeaderProps) {
             <Link href="/pricing" className="text-gray-600 hover:text-gray-900 transition-colors">
               Pricing
             </Link>
-            {user.is_admin && (
+            {isAdmin && (
               <Link href="/admin" className="text-gray-600 hover:text-gray-900 transition-colors">
                 Admin
               </Link>
@@ -74,12 +79,12 @@ export function Header({ user }: HeaderProps) {
               <Badge variant="outline" className="cursor-pointer hover:bg-gray-50">
                 <Coins className="h-3 w-3 mr-1" />
                 <span className="hidden lg:inline">Tokens: </span>
-                {user.tokens}
+                {userTokens}
               </Badge>
             </Link>
 
             {/* Buy Tokens Button */}
-            {user.tokens <= 50 && (
+            {userTokens <= 50 && (
               <Link href="/pricing">
                 <Button size="sm" variant="outline" className="hidden lg:flex bg-transparent">
                   <CreditCard className="h-4 w-4 mr-2" />
@@ -102,8 +107,8 @@ export function Header({ user }: HeaderProps) {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <div className="flex items-center justify-start gap-2 p-2">
                   <div className="flex flex-col space-y-1 leading-none">
-                    <p className="font-medium">{user.email}</p>
-                    <p className="text-xs text-muted-foreground">{user.tokens} tokens remaining</p>
+                    <p className="font-medium">{userEmail}</p>
+                    <p className="text-xs text-muted-foreground">{userTokens} tokens remaining</p>
                   </div>
                 </div>
                 <DropdownMenuSeparator />
@@ -119,7 +124,7 @@ export function Header({ user }: HeaderProps) {
                     Buy Tokens
                   </Link>
                 </DropdownMenuItem>
-                {user.is_admin && (
+                {isAdmin && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin" className="cursor-pointer">
                       <Shield className="mr-2 h-4 w-4" />
@@ -142,7 +147,7 @@ export function Header({ user }: HeaderProps) {
             <Link href="/pricing">
               <Badge variant="outline" className="cursor-pointer">
                 <Coins className="h-3 w-3 mr-1" />
-                {user.tokens}
+                {userTokens}
               </Badge>
             </Link>
 
@@ -158,8 +163,8 @@ export function Header({ user }: HeaderProps) {
             <div className="flex flex-col space-y-4">
               {/* User Info */}
               <div className="px-4 py-2 bg-gray-50 rounded-lg">
-                <p className="font-medium text-sm">{user.email}</p>
-                <p className="text-xs text-gray-600">{user.tokens} tokens remaining</p>
+                <p className="font-medium text-sm">{userEmail}</p>
+                <p className="text-xs text-gray-600">{userTokens} tokens remaining</p>
               </div>
 
               {/* Navigation Links */}
@@ -184,7 +189,7 @@ export function Header({ user }: HeaderProps) {
               >
                 Pricing
               </Link>
-              {user.is_admin && (
+              {isAdmin && (
                 <Link
                   href="/admin"
                   className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50"

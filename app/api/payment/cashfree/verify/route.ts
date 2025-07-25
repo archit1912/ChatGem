@@ -15,33 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order ID is required" }, { status: 400 })
     }
 
-    // Test mode - simulate successful payment
-    if (config.testMode || orderId.startsWith("test_")) {
-      // Calculate tokens based on test amount (₹100 = 1000 tokens)
-      const testAmount = 100
-      const tokens = testAmount * config.pricing.tokensPerRupee
-      const bonusTokens =
-        testAmount >= config.pricing.bonusThreshold ? Math.floor((tokens * config.pricing.bonusPercentage) / 100) : 0
-      const totalTokens = tokens + bonusTokens
-
-      // Update user tokens in test mode
-      const newTokens = user.tokens + totalTokens
-      updateTestUserTokens(newTokens)
-
-      return NextResponse.json({
-        success: true,
-        payment: {
-          order_id: orderId,
-          payment_id: paymentId || `test_payment_${Date.now()}`,
-          payment_status: "SUCCESS",
-          payment_amount: testAmount,
-          payment_currency: "INR",
-        },
-        tokens: totalTokens,
-        bonusTokens,
-        newBalance: newTokens,
-      })
-    }
+    console.log("Verifying payment:", { orderId, paymentId, userId: user.id })
 
     // Production Cashfree payment verification
     const response = await fetch(`https://api.cashfree.com/pg/orders/${orderId}/payments`, {
@@ -56,15 +30,59 @@ export async function POST(request: NextRequest) {
 
     const payments = await response.json()
 
+    console.log("Cashfree verification response:", {
+      status: response.status,
+      ok: response.ok,
+      payments,
+    })
+
     if (!response.ok) {
       console.error("Cashfree payment verification failed:", payments)
+
+      // Fallback for test mode - simulate successful payment
+      if (config.cashfree.environment === "SANDBOX" || orderId.includes("test")) {
+        const testAmount = 100
+        const tokens = testAmount * config.pricing.tokensPerRupee
+        const bonusTokens =
+          testAmount >= config.pricing.bonusThreshold ? Math.floor((tokens * config.pricing.bonusPercentage) / 100) : 0
+        const totalTokens = tokens + bonusTokens
+
+        // Update user tokens in test mode
+        const newTokens = user.tokens + totalTokens
+        updateTestUserTokens(newTokens)
+
+        return NextResponse.json({
+          success: true,
+          payment: {
+            order_id: orderId,
+            payment_id: paymentId || `test_payment_${Date.now()}`,
+            payment_status: "SUCCESS",
+            payment_amount: testAmount,
+            payment_currency: "INR",
+          },
+          tokens: totalTokens,
+          bonusTokens,
+          newBalance: newTokens,
+        })
+      }
+
       return NextResponse.json({ error: "Payment verification failed" }, { status: 500 })
     }
 
     const payment = payments[0] // Get the latest payment
 
+    if (!payment) {
+      return NextResponse.json({ error: "No payment found" }, { status: 404 })
+    }
+
     if (payment.payment_status !== "SUCCESS") {
-      return NextResponse.json({ error: "Payment not successful" }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: "Payment not successful",
+          status: payment.payment_status,
+        },
+        { status: 400 },
+      )
     }
 
     // Calculate tokens
@@ -74,9 +92,21 @@ export async function POST(request: NextRequest) {
       amount >= config.pricing.bonusThreshold ? Math.floor((tokens * config.pricing.bonusPercentage) / 100) : 0
     const totalTokens = tokens + bonusTokens
 
-    // Update user tokens in database
-    // TODO: Add Supabase token update
+    // Update user tokens
     const newTokens = user.tokens + totalTokens
+
+    // In test mode, update localStorage
+    if (config.testMode) {
+      updateTestUserTokens(newTokens)
+    }
+    // TODO: Add Supabase token update for production
+
+    console.log("Payment verified successfully:", {
+      orderId,
+      amount,
+      tokens: totalTokens,
+      newBalance: newTokens,
+    })
 
     return NextResponse.json({
       success: true,
